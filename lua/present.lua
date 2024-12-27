@@ -5,7 +5,12 @@ M.setup = function()
 end
 
 ---@class present.Slides
----@fields slides string[]: The slides of the file
+---@field slides present.Slide[]: The slides of the file
+
+---@class present.Slide
+---@field title string: The title of the slide
+---@field body string[]: The body of the slide
+
 
 ---Takes some lines and parses them
 ---@param lines string[]: The lines in the buffer
@@ -13,23 +18,27 @@ end
 ---
 local parse_slides = function(lines)
     local slides = { slides = {} }
-    local current_slide = {}
+    local current_slide = {
+        title = "",
+        body = {}
+    }
 
     local separator = "^#"
 
-    --- TODO: Continue...
-    --- Time 10:41
-
     for _, line in ipairs(lines) do
         if line:find(separator) then
-            if #current_slide > 0 then
+            if #current_slide.title > 0 then
                 table.insert(slides.slides, current_slide)
             end
 
-            current_slide = {}
+            current_slide = {
+                title = line,
+                body = {}
+            }
+        else
+            -- TODO: Continue 8:10
+            table.insert(current_slide.body, line)
         end
-
-        table.insert(current_slide, line)
     end
 
     table.insert(slides.slides, current_slide)
@@ -80,14 +89,14 @@ M.init = function(opts)
     local current_slide = 1
     vim.keymap.set("n", "n", function()
         current_slide = math.min(current_slide + 1, #parsed.slides)
-        vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[current_slide])
+        vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[current_slide].body)
     end, {
         buffer = float_win.buf
     })
 
     vim.keymap.set("n", "p", function()
         current_slide = math.max(current_slide - 1, 1)
-        vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[current_slide])
+        vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[current_slide].body)
     end, {
         buffer = float_win.buf
     })
@@ -98,12 +107,31 @@ M.init = function(opts)
         buffer = float_win.buf
     })
 
-    -- TODO: continue 3:35 ...
+    local restore = {
+        cmdheight = {
+            original = vim.o.cmdheight,
+            actual = 0
+        }
+    }
+    -- Set the options we want during presentation
+    for option, config in pairs(restore) do
+        vim.opt[option] = config.actual
+    end
 
-    vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[1])
+    vim.api.nvim_create_autocmd("BufLeave", {
+        buffer = float_win.buf,
+        callback = function()
+            -- Reset the values when we are done with the presentation
+            for option, config in pairs(restore) do
+                vim.opt[option] = config.original
+            end
+        end
+    })
+
+    vim.api.nvim_buf_set_lines(float_win.buf, 0, -1, false, parsed.slides[1].body)
 end
 
--- M.init { bufnr = 9 }
+M.init { bufnr = 38 }
 
 -- vim.print(parse_slides {
 --     "# Hello",
